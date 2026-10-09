@@ -1,0 +1,6 @@
+{
+  "name": "CELPIP Master 12 - Elite Exam Simulator & AI Coach",
+  "description": "Adaptive CELPIP-General exam simulator targeting CLB 11-12 with AI grading, multi-speaker audio, mic recording, unique question generator, and real-exam fidelity.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

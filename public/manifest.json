@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "CELPIP Master 12 - Elite Exam Simulator & AI Coach",
+  "short_name": "CELPIP 12",
+  "description": "Adaptive CELPIP-General simulation web app targeting CLB 11-12 with AI grading, audio scripts, and mic recording.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#0284c7",
+  "background_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
