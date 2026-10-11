@@ -73,12 +73,18 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
     };
   }, [audioPlayed, currentQuestionIdx, currentPartIdx]);
 
+  const [audioStatus, setAudioStatus] = useState<'generating' | 'cached' | 'playing' | 'fallback' | 'idle'>('idle');
+
   const startAudioPlayback = () => {
     if (isPlayingAudio) return;
     setIsPlayingAudio(true);
 
-    audioControllerRef.current = audioEngine.playMultiSpeakerDialogue(
+    audioControllerRef.current = audioEngine.playGeminiDialogue(
+      currentPart.partId,
       currentPart.audioScript,
+      (status) => {
+        setAudioStatus(status);
+      },
       (_idx, speaker) => {
         setActiveSpeaker(speaker);
       },
@@ -86,6 +92,7 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
         setIsPlayingAudio(false);
         setAudioPlayed(true);
         setActiveSpeaker('');
+        setAudioStatus('idle');
       }
     );
   };
@@ -97,6 +104,7 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
     }
     audioEngine.stop();
     setIsPlayingAudio(false);
+    setAudioStatus('idle');
   };
 
   const handleSelectOption = (optionId: string) => {
@@ -170,11 +178,20 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
             <Volume2 className="w-5 h-5" />
           </motion.div>
           <div>
-            <div className="text-xs font-semibold text-slate-800">
-              {isPlayingAudio ? 'Audio is Playing...' : audioPlayed ? 'Audio Concluded' : 'Preparing Audio...'}
+            <div className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+              <span>{isPlayingAudio ? 'Audio is Playing...' : audioPlayed ? 'Audio Concluded' : audioStatus === 'generating' ? 'Synthesizing with Gemini 3.8 Flash...' : 'Preparing Audio...'}</span>
+              {audioStatus === 'cached' && (
+                <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-medium">Cached</span>
+              )}
             </div>
             <div className="text-[11px] text-slate-500">
-              {isPlayingAudio && activeSpeaker ? `Speaking: ${activeSpeaker}` : deliveryMode === 'exam' ? 'Plays once only' : 'Practice mode'}
+              {isPlayingAudio && activeSpeaker
+                ? `Speaking: ${activeSpeaker}`
+                : audioStatus === 'generating'
+                ? 'Synthesizing multi-speaker Canadian dialogue'
+                : deliveryMode === 'exam'
+                ? 'Official exam mode (plays once only)'
+                : 'Practice mode (instant replay available)'}
             </div>
           </div>
 

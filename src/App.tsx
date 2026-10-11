@@ -110,7 +110,9 @@ export default function App() {
 
     // Determine sequence of skills
     let sequence: SkillComponent[] = ['listening', 'reading', 'writing', 'speaking'];
-    if (config.mode === 'section_mock' && config.selectedSkill) {
+    if (config.mode === 'ls_mock') {
+      sequence = ['listening', 'speaking'];
+    } else if (config.mode === 'section_mock' && config.selectedSkill) {
       sequence = [config.selectedSkill];
     } else if (config.mode === 'weak_spot') {
       sequence = ['reading', 'listening'];

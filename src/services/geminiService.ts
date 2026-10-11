@@ -109,6 +109,46 @@ export const geminiClientService = {
     return '';
   },
 
+  /**
+   * Gemini 3.8 Flash TTS Single Track Generation
+   */
+  async synthesizeSpeech(text: string, voiceName?: string): Promise<string | null> {
+    try {
+      const response = await fetch('/api/tts-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voiceName })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return data.audioDataUrl || null;
+      }
+    } catch (err) {
+      console.warn('TTS fetch failed:', err);
+    }
+    return null;
+  },
+
+  /**
+   * Gemini 3.8 Flash TTS Multi-Speaker Dialogue Generation
+   */
+  async synthesizeDialogue(turns: Array<{ speaker: string; text: string; voiceGender?: 'male' | 'female' }>): Promise<Array<{ turnIndex: number; audioDataUrl: string; speaker: string }> | null> {
+    try {
+      const response = await fetch('/api/tts-dialogue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ turns })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return data.turns || null;
+      }
+    } catch (err) {
+      console.warn('Dialogue TTS fetch failed:', err);
+    }
+    return null;
+  },
+
   // CLIENT FALLBACK EVALUATORS (CLB-Aligned Rules)
   fallbackGradeWriting(taskNumber: number, text: string): WritingGradingResult {
     const words = text.trim().split(/\s+/).filter(Boolean);

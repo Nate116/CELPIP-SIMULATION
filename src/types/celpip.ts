@@ -14,6 +14,7 @@ export type DifficultyLevel =
 
 export type TestMode =
   | 'full_mock'
+  | 'ls_mock'
   | 'section_mock'
   | 'drill'
   | 'weak_spot'

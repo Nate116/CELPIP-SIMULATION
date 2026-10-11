@@ -12,7 +12,8 @@ import {
   ArrowRight,
   ChevronRight,
   BookOpen,
-  BarChart3
+  BarChart3,
+  Headphones
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -126,7 +127,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 className="flex items-center gap-2 px-6 py-3 bg-sky-500 hover:bg-sky-400 active:bg-sky-600 text-slate-950 font-bold rounded-xl text-sm shadow-lg shadow-sky-500/25 transition cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-current" />
-                Launch Full Simulation
+                Launch CELPIP-General
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() =>
+                  onStartSimulation({
+                    mode: 'ls_mock',
+                    deliveryMode,
+                    difficulty: selectedDifficulty
+                  })
+                }
+                className="flex items-center gap-2 px-5 py-3 bg-indigo-500/80 hover:bg-indigo-400 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-500/25 transition cursor-pointer border border-indigo-400/30"
+              >
+                <Headphones className="w-4 h-4" />
+                CELPIP-General LS (Listen + Speak)
               </motion.button>
 
               <motion.button

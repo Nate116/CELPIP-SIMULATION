@@ -9,6 +9,9 @@
 
 import { SpeakerTurn } from '../types/celpip';
 
+import { audioCache } from './audioCache';
+import { geminiClientService } from './geminiService';
+
 class AudioEngine {
   private audioCtx: AudioContext | null = null;
   private currentAudioElement: HTMLAudioElement | null = null;
@@ -118,7 +121,96 @@ class AudioEngine {
   }
 
   /**
-   * Natural Multi-Speaker Dialogue Synthesizer (Web Speech API)
+   * Realistic Gemini 3.8 Flash TTS Dialogue Engine with IndexedDB Caching
+   * Automatically generates high-quality multi-speaker audio on-demand
+   * and replays instantly from local cache if already generated.
+   */
+  public playGeminiDialogue(
+    partId: string,
+    script: SpeakerTurn[],
+    onStatusChange?: (status: 'generating' | 'cached' | 'playing' | 'fallback') => void,
+    onProgress?: (turnIndex: number, currentSpeaker: string) => void,
+    onComplete?: () => void
+  ): { stop: () => void } {
+    this.stop();
+    let isCancelled = false;
+
+    const executePlayback = async () => {
+      // 1. Check if all turns are already cached in IndexedDB
+      const cachedTurnUrls = await audioCache.getDialogueTurns(partId, script.length);
+
+      let turnUrls: string[] = [];
+
+      if (cachedTurnUrls && cachedTurnUrls.length === script.length) {
+        if (onStatusChange) onStatusChange('cached');
+        turnUrls = cachedTurnUrls;
+      } else {
+        // 2. Synthesize on-demand via Gemini 3.8 Flash TTS
+        if (onStatusChange) onStatusChange('generating');
+        const synthResult = await geminiClientService.synthesizeDialogue(script);
+
+        if (isCancelled) return;
+
+        if (synthResult && synthResult.length > 0) {
+          // Cache each turn for instantaneous zero-latency replay
+          for (const item of synthResult) {
+            turnUrls[item.turnIndex] = item.audioDataUrl;
+            await audioCache.setAudio(`${partId}_turn_${item.turnIndex}`, item.audioDataUrl, item.speaker);
+          }
+        } else {
+          // Graceful fallback to client Web Speech API if backend TTS unavailable
+          if (onStatusChange) onStatusChange('fallback');
+          return this.playMultiSpeakerDialogue(script, onProgress, onComplete);
+        }
+      }
+
+      if (isCancelled) return;
+      if (onStatusChange) onStatusChange('playing');
+
+      // 3. Play sequential dialogue turns with realistic conversational pauses
+      for (let i = 0; i < turnUrls.length; i++) {
+        if (isCancelled) break;
+        const url = turnUrls[i];
+        const turn = script[i];
+
+        if (onProgress) onProgress(i, turn ? turn.speaker : '');
+
+        if (url) {
+          await new Promise<void>((resolve) => {
+            this.playAudioUrl(url, () => {
+              // Natural conversational cadence gap between speaker turns
+              setTimeout(resolve, 450);
+            }).catch(() => {
+              // Fallback to brief timeout if audio element errors
+              setTimeout(resolve, 800);
+            });
+          });
+        }
+      }
+
+      if (!isCancelled && onComplete) {
+        onComplete();
+      }
+    };
+
+    executePlayback().catch((err) => {
+      console.warn('Gemini dialogue playback issue, switching to fallback:', err);
+      if (!isCancelled) {
+        if (onStatusChange) onStatusChange('fallback');
+        this.playMultiSpeakerDialogue(script, onProgress, onComplete);
+      }
+    });
+
+    return {
+      stop: () => {
+        isCancelled = true;
+        this.stop();
+      }
+    };
+  }
+
+  /**
+   * Natural Multi-Speaker Dialogue Synthesizer (Web Speech API Fallback)
    * Alternates voices and pitch/rate per speaker turn
    */
   public playMultiSpeakerDialogue(
@@ -135,7 +227,6 @@ class AudioEngine {
     }
 
     const voices = window.speechSynthesis.getVoices();
-    // Prioritize English voices (en-CA, en-US, en-GB)
     const englishVoices = voices.filter(v => v.lang.startsWith('en'));
 
     let currentTurn = 0;
@@ -154,7 +245,6 @@ class AudioEngine {
       const utterance = new SpeechSynthesisUtterance(turn.text);
       this.speechUtterance = utterance;
 
-      // Assign voice profile based on speaker name / gender
       const isFemale = turn.voiceGender === 'female' ||
         turn.speaker.toLowerCase().includes('evelyn') ||
         turn.speaker.toLowerCase().includes('chloe') ||
@@ -176,13 +266,11 @@ class AudioEngine {
         utterance.voice = preferredVoice;
       }
 
-      // Natural speech cadence
-      utterance.rate = 0.98; // Realistic assessment pacing
+      utterance.rate = 0.98;
       utterance.pitch = isFemale ? 1.05 : 0.95;
 
       utterance.onend = () => {
         currentTurn++;
-        // Natural conversational gap between turns (400ms)
         setTimeout(() => {
           if (!isCancelled) playNextTurn();
         }, 450);
@@ -198,7 +286,6 @@ class AudioEngine {
       window.speechSynthesis.speak(utterance);
     };
 
-    // Ensure voices are loaded
     if (voices.length === 0) {
       window.speechSynthesis.onvoiceschanged = () => {
         if (!isCancelled) playNextTurn();
