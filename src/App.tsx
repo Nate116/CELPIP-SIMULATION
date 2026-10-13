@@ -80,7 +80,7 @@ export default function App() {
   }) => {
     setPendingSimConfig(config);
     // If exam includes listening or speaking, trigger equipment check
-    const needsAudio = config.mode === 'full_mock' || config.selectedSkill === 'listening' || config.selectedSkill === 'speaking';
+    const needsAudio = config.mode === 'full_mock' || config.mode === 'ls_mock' || config.selectedSkill === 'listening' || config.selectedSkill === 'speaking';
     if (needsAudio) {
       setShowEquipmentCheck(true);
     } else {
@@ -100,7 +100,10 @@ export default function App() {
     if (config.customSimId) {
       sim = SAMPLE_SIMULATIONS.find(s => s.id === config.customSimId) || SAMPLE_SIMULATIONS[0];
     } else {
-      sim = storageService.getNextUnseenSimulation(config.difficulty);
+      sim = storageService.getNextUnseenSimulation(config.difficulty) || SAMPLE_SIMULATIONS[0];
+    }
+    if (!sim) {
+      sim = SAMPLE_SIMULATIONS[0];
     }
 
     setActiveSimulation(sim);
@@ -144,7 +147,11 @@ export default function App() {
     };
     setCurrentAttempt(newAttempt);
     setCurrentView('exam');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
   };
 
   // Section completion handlers
@@ -343,7 +350,7 @@ export default function App() {
             <ExamLayout
               currentSkill={activeSkill}
               examMode={deliveryMode}
-              simulationTitle={activeSimulation.title}
+              simulationTitle={activeSimulation?.title || 'CELPIP Official Practice Simulation'}
               fontSize={fontSize}
               isHighContrast={isHighContrast}
               onToggleHighContrast={() => setIsHighContrast(!isHighContrast)}
@@ -355,7 +362,8 @@ export default function App() {
             >
               {activeSkill === 'listening' && (
                 <ListeningComponent
-                  parts={activeSimulation.listeningParts}
+                  key={`${activeSimulation?.id || 'sim'}_listening_${skillSequenceIndex}`}
+                  parts={activeSimulation?.listeningParts || SAMPLE_SIMULATIONS[0].listeningParts}
                   deliveryMode={deliveryMode}
                   fontSizeClass={fontSize === 'xlarge' ? 'text-lg' : fontSize === 'large' ? 'text-base' : 'text-sm'}
                   onComplete={handleListeningComplete}
@@ -364,7 +372,8 @@ export default function App() {
 
               {activeSkill === 'reading' && (
                 <ReadingComponent
-                  parts={activeSimulation.readingParts}
+                  key={`${activeSimulation?.id || 'sim'}_reading_${skillSequenceIndex}`}
+                  parts={activeSimulation?.readingParts || SAMPLE_SIMULATIONS[0].readingParts}
                   deliveryMode={deliveryMode}
                   fontSizeClass={fontSize === 'xlarge' ? 'text-lg' : fontSize === 'large' ? 'text-base' : 'text-sm'}
                   onComplete={handleReadingComplete}
@@ -373,7 +382,8 @@ export default function App() {
 
               {activeSkill === 'writing' && (
                 <WritingComponent
-                  tasks={activeSimulation.writingTasks}
+                  key={`${activeSimulation?.id || 'sim'}_writing_${skillSequenceIndex}`}
+                  tasks={activeSimulation?.writingTasks || SAMPLE_SIMULATIONS[0].writingTasks}
                   deliveryMode={deliveryMode}
                   fontSizeClass={fontSize === 'xlarge' ? 'text-lg' : fontSize === 'large' ? 'text-base' : 'text-sm'}
                   onComplete={handleWritingComplete}
@@ -382,7 +392,8 @@ export default function App() {
 
               {activeSkill === 'speaking' && (
                 <SpeakingComponent
-                  tasks={activeSimulation.speakingTasks}
+                  key={`${activeSimulation?.id || 'sim'}_speaking_${skillSequenceIndex}`}
+                  tasks={activeSimulation?.speakingTasks || SAMPLE_SIMULATIONS[0].speakingTasks}
                   deliveryMode={deliveryMode}
                   fontSizeClass={fontSize === 'xlarge' ? 'text-lg' : fontSize === 'large' ? 'text-base' : 'text-sm'}
                   onComplete={handleSpeakingComplete}
@@ -452,9 +463,12 @@ export default function App() {
         }
         onProceed={() => {
           setShowEquipmentCheck(false);
-          if (pendingSimConfig) {
-            executeStartSimulation(pendingSimConfig);
-          }
+          const configToRun = pendingSimConfig || {
+            mode: 'full_mock',
+            deliveryMode: 'exam',
+            difficulty: 'elite'
+          };
+          executeStartSimulation(configToRun);
         }}
         onClose={() => setShowEquipmentCheck(false)}
       />

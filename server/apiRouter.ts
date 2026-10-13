@@ -386,91 +386,96 @@ Perform evaluation and return JSON.`;
         audioDataUrl: string;
       }> = [];
 
-      for (let i = 0; i < turns.length; i++) {
-        const turn = turns[i];
-        const speakerLower = turn.speaker.toLowerCase();
-        const isFemale =
-          turn.voiceGender === 'female' ||
-          speakerLower.includes('evelyn') ||
-          speakerLower.includes('chloe') ||
-          speakerLower.includes('nadia') ||
-          speakerLower.includes('brenda') ||
-          speakerLower.includes('sandra') ||
-          speakerLower.includes('woman') ||
-          speakerLower.includes('her') ||
-          speakerLower.includes('receptionist');
+      // Generate dialogue turns in parallel to prevent Netlify serverless function timeouts
+      await Promise.allSettled(
+        turns.map(async (turn, i) => {
+          const speakerLower = turn.speaker.toLowerCase();
+          const isFemale =
+            turn.voiceGender === 'female' ||
+            speakerLower.includes('evelyn') ||
+            speakerLower.includes('chloe') ||
+            speakerLower.includes('nadia') ||
+            speakerLower.includes('brenda') ||
+            speakerLower.includes('sandra') ||
+            speakerLower.includes('woman') ||
+            speakerLower.includes('her') ||
+            speakerLower.includes('receptionist');
 
-        const voiceName = isFemale
-          ? FEMALE_VOICES[i % FEMALE_VOICES.length]
-          : MALE_VOICES[i % MALE_VOICES.length];
+          const voiceName = isFemale
+            ? FEMALE_VOICES[i % FEMALE_VOICES.length]
+            : MALE_VOICES[i % MALE_VOICES.length];
 
-        try {
-          let response;
           try {
-            response = await ai.models.generateContent({
-              model: 'gemini-3.8-flash-tts',
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      text: turn.text,
-                      speechMetadata: {
-                        style: 'Spoken naturally in Canadian conversational English with pauses, realistic intonation, and clarity'
+            let response;
+            try {
+              response = await ai.models.generateContent({
+                model: 'gemini-3.8-flash-tts',
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: turn.text,
+                        speechMetadata: {
+                          style: 'Spoken naturally in Canadian conversational English with pauses, realistic intonation, and clarity'
+                        }
                       }
+                    ]
+                  }
+                ],
+                config: {
+                  responseModalities: ['AUDIO'],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName }
                     }
-                  ]
-                }
-              ],
-              config: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName }
                   }
                 }
-              }
-            });
-          } catch {
-            response = await ai.models.generateContent({
-              model: 'gemini-3.8-flash-lite-tts',
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      text: turn.text,
-                      speechMetadata: {
-                        style: 'Spoken naturally in Canadian conversational English with realistic intonation'
+              });
+            } catch {
+              response = await ai.models.generateContent({
+                model: 'gemini-3.8-flash-lite-tts',
+                contents: [
+                  {
+                    role: 'user',
+                    parts: [
+                      {
+                        text: turn.text,
+                        speechMetadata: {
+                          style: 'Spoken naturally in Canadian conversational English with realistic intonation'
+                        }
                       }
+                    ]
+                  }
+                ],
+                config: {
+                  responseModalities: ['AUDIO'],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName }
                     }
-                  ]
-                }
-              ],
-              config: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName }
                   }
                 }
-              }
-            });
-          }
+              });
+            }
 
-          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-          if (base64Audio) {
-            audioTurns.push({
-              turnIndex: i,
-              speaker: turn.speaker,
-              voiceName,
-              audioDataUrl: `data:audio/wav;base64,${base64Audio}`
-            });
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+              audioTurns.push({
+                turnIndex: i,
+                speaker: turn.speaker,
+                voiceName,
+                audioDataUrl: `data:audio/wav;base64,${base64Audio}`
+              });
+            }
+          } catch (turnErr) {
+            console.warn(`Failed to synthesize turn ${i} (${turn.speaker}):`, turnErr);
           }
-        } catch (turnErr) {
-          console.warn(`Failed to synthesize turn ${i} (${turn.speaker}):`, turnErr);
-        }
-      }
+        })
+      );
+
+      // Maintain original script order
+      audioTurns.sort((a, b) => a.turnIndex - b.turnIndex);
 
       res.json({ turns: audioTurns });
     } catch (err: unknown) {

@@ -269,29 +269,56 @@ class AudioEngine {
       utterance.rate = 0.98;
       utterance.pitch = isFemale ? 1.05 : 0.95;
 
-      utterance.onend = () => {
+      let turnAdvanced = false;
+      let turnTimeoutId: NodeJS.Timeout | null = null;
+
+      const advanceTurn = () => {
+        if (turnAdvanced) return;
+        turnAdvanced = true;
+        if (turnTimeoutId) clearTimeout(turnTimeoutId);
         currentTurn++;
         setTimeout(() => {
           if (!isCancelled) playNextTurn();
-        }, 450);
+        }, 400);
       };
 
+      utterance.onend = advanceTurn;
       utterance.onerror = (e) => {
         console.warn('Utterance error:', e);
-        currentTurn++;
-        if (!isCancelled) playNextTurn();
+        advanceTurn();
       };
 
+      // Failsafe: max 12 seconds per turn in case speech synthesis stalls or browser pauses audio
+      turnTimeoutId = setTimeout(() => {
+        console.warn('Speech synthesis turn timeout triggered');
+        advanceTurn();
+      }, 12000);
+
       this.isSpeaking = true;
-      window.speechSynthesis.speak(utterance);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('speechSynthesis.speak error:', err);
+        advanceTurn();
+      }
+    };
+
+    let hasStarted = false;
+    const startSafely = () => {
+      if (!hasStarted && !isCancelled) {
+        hasStarted = true;
+        playNextTurn();
+      }
     };
 
     if (voices.length === 0) {
       window.speechSynthesis.onvoiceschanged = () => {
-        if (!isCancelled) playNextTurn();
+        startSafely();
       };
+      // 300ms fallback if onvoiceschanged does not fire
+      setTimeout(startSafely, 300);
     } else {
-      playNextTurn();
+      startSafely();
     }
 
     return {

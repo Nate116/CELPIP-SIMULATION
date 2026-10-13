@@ -37,8 +37,8 @@ export const SpeakingComponent: React.FC<SpeakingComponentProps> = ({
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const currentTask = tasks[currentTaskIdx];
-  const isPractice = currentTask.taskNumber === 0;
+  const currentTask = (tasks && tasks[currentTaskIdx]) || (tasks && tasks[0]);
+  const isPractice = currentTask?.taskNumber === 0;
 
   useEffect(() => {
     return () => {
@@ -49,7 +49,7 @@ export const SpeakingComponent: React.FC<SpeakingComponentProps> = ({
 
   useEffect(() => {
     setPhase('preparing');
-    setSecondsRemaining(currentTask.preparationSeconds);
+    setSecondsRemaining(currentTask?.preparationSeconds || 30);
 
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
 
@@ -73,7 +73,7 @@ export const SpeakingComponent: React.FC<SpeakingComponentProps> = ({
     await audioEngine.playOfficialBeep();
 
     setPhase('recording');
-    setSecondsRemaining(currentTask.speakingSeconds);
+    setSecondsRemaining(currentTask?.speakingSeconds || 60);
     await startMicrophoneRecording();
 
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -91,6 +91,10 @@ export const SpeakingComponent: React.FC<SpeakingComponentProps> = ({
 
   const startMicrophoneRecording = async () => {
     try {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.warn('Microphone not supported on this browser or origin');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
 
@@ -291,12 +295,12 @@ export const SpeakingComponent: React.FC<SpeakingComponentProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-emerald-100 text-emerald-900 text-xs font-bold rounded-full uppercase tracking-wider">
-              {isPractice ? 'Practice Task' : `Speaking Task ${currentTask.taskNumber} of 8`}
+              {isPractice ? 'Practice Task' : `Speaking Task ${currentTask?.taskNumber || (currentTaskIdx + 1)} of 8`}
             </span>
             <span className="text-xs text-slate-500 font-medium">CELPIP-General Speaking</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentTask.title}</h2>
-          <p className="text-xs text-slate-600 mt-0.5">{currentTask.instructions}</p>
+          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentTask?.title || 'Speaking Task'}</h2>
+          <p className="text-xs text-slate-600 mt-0.5">{currentTask?.instructions || 'Review the prompt and prepare your response.'}</p>
         </div>
 
         {/* Phase Badge & Countdown */}
@@ -344,7 +348,7 @@ export const SpeakingComponent: React.FC<SpeakingComponentProps> = ({
               Prompt Situation
             </h3>
             <p className="text-base md:text-lg text-slate-900 font-medium leading-relaxed">
-              {currentTask.situation}
+              {currentTask?.situation || ''}
             </p>
           </div>
 

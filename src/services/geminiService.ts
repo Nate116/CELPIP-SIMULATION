@@ -112,19 +112,28 @@ export const geminiClientService = {
   /**
    * Gemini 3.8 Flash TTS Single Track Generation
    */
+  /**
+   * Gemini 3.8 Flash TTS Single Track Generation
+   */
   async synthesizeSpeech(text: string, voiceName?: string): Promise<string | null> {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
       const response = await fetch('/api/tts-speech', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voiceName })
+        body: JSON.stringify({ text, voiceName }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         return data.audioDataUrl || null;
       }
     } catch (err) {
-      console.warn('TTS fetch failed:', err);
+      console.warn('TTS fetch failed or timed out:', err);
     }
     return null;
   },
@@ -134,17 +143,23 @@ export const geminiClientService = {
    */
   async synthesizeDialogue(turns: Array<{ speaker: string; text: string; voiceGender?: 'male' | 'female' }>): Promise<Array<{ turnIndex: number; audioDataUrl: string; speaker: string }> | null> {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
       const response = await fetch('/api/tts-dialogue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ turns })
+        body: JSON.stringify({ turns }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         return data.turns || null;
       }
     } catch (err) {
-      console.warn('Dialogue TTS fetch failed:', err);
+      console.warn('Dialogue TTS fetch failed or timed out:', err);
     }
     return null;
   },

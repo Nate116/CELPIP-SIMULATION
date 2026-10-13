@@ -29,9 +29,10 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
   const audioControllerRef = useRef<{ stop: () => void } | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const currentPart = parts[currentPartIdx];
-  const isPractice = currentPart.partNumber === 0;
-  const currentQuestion: QuestionItem | undefined = currentPart?.questions[currentQuestionIdx];
+  const currentPart = (parts && parts[currentPartIdx]) || (parts && parts[0]);
+  const isPractice = currentPart?.partNumber === 0;
+  const currentQuestion: QuestionItem | undefined =
+    currentPart?.questions?.[currentQuestionIdx] || currentPart?.questions?.[0];
 
   // Auto-start audio when entering a new part
   useEffect(() => {
@@ -76,12 +77,12 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
   const [audioStatus, setAudioStatus] = useState<'generating' | 'cached' | 'playing' | 'fallback' | 'idle'>('idle');
 
   const startAudioPlayback = () => {
-    if (isPlayingAudio) return;
+    if (isPlayingAudio || !currentPart) return;
     setIsPlayingAudio(true);
 
     audioControllerRef.current = audioEngine.playGeminiDialogue(
-      currentPart.partId,
-      currentPart.audioScript,
+      currentPart.partId || `part_${currentPartIdx}`,
+      currentPart.audioScript || [],
       (status) => {
         setAudioStatus(status);
       },
@@ -104,6 +105,14 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
     }
     audioEngine.stop();
     setIsPlayingAudio(false);
+    setAudioStatus('idle');
+  };
+
+  const skipAudioAndShowQuestions = () => {
+    stopAudioPlayback();
+    setIsPlayingAudio(false);
+    setAudioPlayed(true);
+    setActiveSpeaker('');
     setAudioStatus('idle');
   };
 
@@ -160,12 +169,12 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-sky-100 text-sky-800 text-xs font-bold rounded-full uppercase tracking-wider">
-              {isPractice ? 'Unscored Practice Task' : `Part ${currentPart.partNumber} of 6`}
+              {isPractice ? 'Unscored Practice Task' : `Part ${currentPart?.partNumber ?? (currentPartIdx + 1)} of 6`}
             </span>
             <span className="text-xs text-slate-500 font-medium">CELPIP-General Listening</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentPart.title}</h2>
-          <p className="text-xs text-slate-600 mt-0.5">{currentPart.instructions}</p>
+          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentPart?.title || 'Listening Task'}</h2>
+          <p className="text-xs text-slate-600 mt-0.5">{currentPart?.instructions || 'Listen carefully to the audio and answer the questions.'}</p>
         </div>
 
         {/* Audio Status Indicator */}
@@ -270,6 +279,16 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Skip / Proceed Button */}
+            <div className="pt-2 flex justify-center">
+              <button
+                onClick={skipAudioAndShowQuestions}
+                className="px-5 py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/30 border border-white/20 rounded-xl text-xs font-semibold text-sky-200 transition cursor-pointer backdrop-blur-md"
+              >
+                Skip Audio & Proceed to Questions →
+              </button>
+            </div>
           </motion.div>
         ) : (
           /* Question State with Slide Transition */
@@ -285,7 +304,7 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Question {currentQuestionIdx + 1} of {currentPart.questions.length}
+                  Question {currentQuestionIdx + 1} of {currentPart?.questions?.length || 1}
                 </span>
               </div>
 
@@ -387,7 +406,7 @@ export const ListeningComponent: React.FC<ListeningComponentProps> = ({
                 className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white rounded-xl font-semibold text-sm shadow-md shadow-sky-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
               >
                 <span>
-                  {currentQuestionIdx < currentPart.questions.length - 1
+                  {currentQuestionIdx < (currentPart?.questions?.length || 1) - 1
                     ? 'Next Question'
                     : currentPartIdx < parts.length - 1
                     ? 'Next Listening Part'

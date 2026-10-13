@@ -275,23 +275,32 @@ export const HeadsetCheckModal: React.FC<HeadsetCheckModalProps> = ({
             </div>
 
             {/* Footer */}
-            <div className="p-4 bg-slate-100 border-t border-slate-200 flex justify-end gap-3">
-              {onClose && (
+            <div className="p-4 bg-slate-100 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {onClose && (
+                  <button
+                    onClick={onClose}
+                    className="px-3.5 py-2 text-slate-600 hover:text-slate-800 text-xs font-semibold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-slate-600 hover:text-slate-800 text-xs font-semibold transition cursor-pointer"
+                  onClick={handleFinish}
+                  className="px-3 py-2 text-sky-700 hover:text-sky-900 hover:underline text-xs font-medium transition cursor-pointer"
+                  title="Bypass sound and mic verification and start test immediately"
                 >
-                  Cancel
+                  Skip Check & Start Test
                 </button>
-              )}
+              </div>
+
               <motion.button
-                whileHover={isReady ? { scale: 1.02 } : {}}
-                whileTap={isReady ? { scale: 0.98 } : {}}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={handleFinish}
-                disabled={!isReady}
-                className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-sky-600/20 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                className="px-6 py-2.5 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white rounded-xl text-sm font-semibold shadow-md shadow-sky-600/20 transition cursor-pointer"
               >
-                Start Assessment
+                {isReady ? 'Start Assessment' : 'Proceed to Test'}
               </motion.button>
             </div>
           </motion.div>

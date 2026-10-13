@@ -28,8 +28,8 @@ export const WritingComponent: React.FC<WritingComponentProps> = ({
   const [gradingResults, setGradingResults] = useState<Record<string, WritingGradingResult>>({});
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const currentTask = tasks[currentTaskIdx];
-  const currentText = userTexts[currentTask?.taskId] || '';
+  const currentTask = (tasks && tasks[currentTaskIdx]) || (tasks && tasks[0]);
+  const currentText = userTexts[currentTask?.taskId || 'w_task_1'] || '';
 
   // Live word counter
   const words = currentText.trim().split(/\s+/).filter(Boolean);
@@ -159,11 +159,11 @@ export const WritingComponent: React.FC<WritingComponentProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-amber-100 text-amber-900 text-xs font-bold rounded-full uppercase tracking-wider">
-              Writing Task {currentTask.taskNumber} of {tasks.length}
+              Writing Task {currentTask?.taskNumber || (currentTaskIdx + 1)} of {tasks?.length || 2}
             </span>
             <span className="text-xs text-slate-500 font-medium">CELPIP-General Writing</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentTask.title}</h2>
+          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentTask?.title || 'Writing Task'}</h2>
           <p className="text-xs text-slate-600 mt-0.5">Target: 150 – 200 words | Exam Mode: No spellcheck</p>
         </div>
 
@@ -216,11 +216,11 @@ export const WritingComponent: React.FC<WritingComponentProps> = ({
             </div>
 
             <div className="text-sm md:text-base text-slate-700 leading-relaxed whitespace-pre-line">
-              {currentTask.instructions}
+              {currentTask?.instructions || ''}
             </div>
 
             {/* Task 1 Mandatory Bullets */}
-            {currentTask.bulletPoints && currentTask.bulletPoints.length > 0 && (
+            {currentTask?.bulletPoints && currentTask.bulletPoints.length > 0 && (
               <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2.5 shadow-2xs">
                 <span className="text-xs font-bold text-amber-900 uppercase tracking-wide">
                   Mandatory Content to Address:

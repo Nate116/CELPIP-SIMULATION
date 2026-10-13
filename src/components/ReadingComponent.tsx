@@ -20,7 +20,7 @@ export const ReadingComponent: React.FC<ReadingComponentProps> = ({
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
 
-  const currentPart = parts[currentPartIdx];
+  const currentPart = (parts && parts[currentPartIdx]) || (parts && parts[0]);
 
   const handleSelectAnswer = (questionId: string, optionId: string) => {
     setUserAnswers((prev) => ({
@@ -30,7 +30,7 @@ export const ReadingComponent: React.FC<ReadingComponentProps> = ({
   };
 
   const handleNextPart = () => {
-    if (currentPartIdx < parts.length - 1) {
+    if (currentPartIdx < (parts?.length || 0) - 1) {
       setCurrentPartIdx((prev) => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
@@ -48,8 +48,8 @@ export const ReadingComponent: React.FC<ReadingComponentProps> = ({
   const calculateAndFinish = () => {
     let score = 0;
     let total = 0;
-    parts.forEach((p) => {
-      p.questions.forEach((q) => {
+    (parts || []).forEach((p) => {
+      (p?.questions || []).forEach((q) => {
         total++;
         if (userAnswers[q.id] === q.correctOptionId) {
           score++;
@@ -59,8 +59,9 @@ export const ReadingComponent: React.FC<ReadingComponentProps> = ({
     onComplete(userAnswers, score, total);
   };
 
-  const answeredCountForPart = currentPart.questions.filter((q) => !!userAnswers[q.id]).length;
-  const progressPercent = Math.round((answeredCountForPart / currentPart.questions.length) * 100);
+  const answeredCountForPart = (currentPart?.questions || []).filter((q) => !!userAnswers[q.id]).length;
+  const totalQuestionsInPart = currentPart?.questions?.length || 1;
+  const progressPercent = Math.round((answeredCountForPart / totalQuestionsInPart) * 100);
 
   return (
     <div className={`space-y-6 ${fontSizeClass}`}>
@@ -73,12 +74,12 @@ export const ReadingComponent: React.FC<ReadingComponentProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full uppercase tracking-wider">
-              Part {currentPart.partNumber} of {parts.length}
+              Part {currentPart?.partNumber || (currentPartIdx + 1)} of {parts?.length || 4}
             </span>
             <span className="text-xs text-slate-500 font-medium">CELPIP-General Reading</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentPart.title}</h2>
-          <p className="text-xs text-slate-600 mt-0.5">{currentPart.instructions}</p>
+          <h2 className="text-xl font-bold text-slate-900 mt-1">{currentPart?.title || 'Reading Task'}</h2>
+          <p className="text-xs text-slate-600 mt-0.5">{currentPart?.instructions || 'Read the passage and answer the questions.'}</p>
         </div>
 
         {/* Progress summary for this part */}
@@ -86,7 +87,7 @@ export const ReadingComponent: React.FC<ReadingComponentProps> = ({
           <div className="text-right">
             <div className="text-xs font-semibold text-slate-700">Questions Answered</div>
             <div className="text-sm font-bold text-indigo-600">
-              {answeredCountForPart} of {currentPart.questions.length}
+              {answeredCountForPart} of {currentPart?.questions?.length || 0}
             </div>
           </div>
           <motion.div

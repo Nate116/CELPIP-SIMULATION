@@ -20,12 +20,6 @@ const STORAGE_KEYS = {
 export const storageService = {
   // USER PROFILE
   getUserProfile(): UserTargetProfile {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
-      if (data) return JSON.parse(data);
-    } catch (e) {
-      console.error('Error reading profile', e);
-    }
     const defaultProfile: UserTargetProfile = {
       targetClbLevel: 10,
       targetPurpose: 'Express Entry (Immigration)',
@@ -37,74 +31,139 @@ export const storageService = {
         speaking: 8
       }
     };
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const data = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+        if (data) {
+          const parsed = JSON.parse(data);
+          return {
+            ...defaultProfile,
+            ...parsed,
+            currentEstimatedLevels: {
+              ...defaultProfile.currentEstimatedLevels,
+              ...(parsed.currentEstimatedLevels || {})
+            }
+          };
+        }
+      }
+    } catch (e) {
+      console.error('Error reading profile', e);
+    }
+
     this.saveUserProfile(defaultProfile);
     return defaultProfile;
   },
 
   saveUserProfile(profile: UserTargetProfile): void {
-    localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+      }
+    } catch (e) {
+      console.warn('Could not save user profile:', e);
+    }
   },
 
   // ATTEMPTS HISTORY
   getAttempts(): TestAttemptRecord[] {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.ATTEMPTS);
-      return data ? JSON.parse(data) : [];
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const data = localStorage.getItem(STORAGE_KEYS.ATTEMPTS);
+        return data ? JSON.parse(data) : [];
+      }
     } catch {
       return [];
     }
+    return [];
   },
 
   saveAttempt(attempt: TestAttemptRecord): void {
-    const attempts = this.getAttempts();
-    const existingIndex = attempts.findIndex(a => a.id === attempt.id);
-    if (existingIndex >= 0) {
-      attempts[existingIndex] = attempt;
-    } else {
-      attempts.unshift(attempt);
+    try {
+      const attempts = this.getAttempts();
+      const existingIndex = attempts.findIndex(a => a.id === attempt.id);
+      if (existingIndex >= 0) {
+        attempts[existingIndex] = attempt;
+      } else {
+        attempts.unshift(attempt);
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          localStorage.setItem(STORAGE_KEYS.ATTEMPTS, JSON.stringify(attempts));
+        } catch (quotaErr) {
+          console.warn('LocalStorage quota limit reached, saving attempt with audio blob links stripped:', quotaErr);
+          const sanitizedAttempts = attempts.map(a => ({
+            ...a,
+            userAnswers: {
+              ...a.userAnswers,
+              speakingAudioBlobs: {}
+            }
+          }));
+          localStorage.setItem(STORAGE_KEYS.ATTEMPTS, JSON.stringify(sanitizedAttempts));
+        }
+      }
+
+      // Update Seen Ledger
+      this.recordSeenItems(attempt);
+
+      // Update User Profile Radar
+      this.updateProfileRadarFromAttempt(attempt);
+    } catch (e) {
+      console.warn('Could not save attempt:', e);
     }
-    localStorage.setItem(STORAGE_KEYS.ATTEMPTS, JSON.stringify(attempts));
-
-    // Update Seen Ledger
-    this.recordSeenItems(attempt);
-
-    // Update User Profile Radar
-    this.updateProfileRadarFromAttempt(attempt);
   },
 
   // SEEN LEDGER FOR DEDUPLICATION
   getSeenItemHashes(): Set<string> {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.SEEN_LEDGER);
-      return data ? new Set(JSON.parse(data)) : new Set<string>();
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const data = localStorage.getItem(STORAGE_KEYS.SEEN_LEDGER);
+        return data ? new Set(JSON.parse(data)) : new Set<string>();
+      }
     } catch {
       return new Set<string>();
     }
+    return new Set<string>();
   },
 
   recordSeenItems(attempt: TestAttemptRecord): void {
-    const seen = this.getSeenItemHashes();
-    seen.add(attempt.simulationId);
-    if (attempt.userAnswers.listening) {
-      Object.keys(attempt.userAnswers.listening).forEach(qId => seen.add(qId));
+    try {
+      const seen = this.getSeenItemHashes();
+      seen.add(attempt.simulationId);
+      if (attempt.userAnswers?.listening) {
+        Object.keys(attempt.userAnswers.listening).forEach(qId => seen.add(qId));
+      }
+      if (attempt.userAnswers?.reading) {
+        Object.keys(attempt.userAnswers.reading).forEach(qId => seen.add(qId));
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEYS.SEEN_LEDGER, JSON.stringify(Array.from(seen)));
+      }
+    } catch (e) {
+      console.warn('Could not record seen items:', e);
     }
-    if (attempt.userAnswers.reading) {
-      Object.keys(attempt.userAnswers.reading).forEach(qId => seen.add(qId));
-    }
-    localStorage.setItem(STORAGE_KEYS.SEEN_LEDGER, JSON.stringify(Array.from(seen)));
   },
 
   // SIMULATIONS BANK
   getAllSimulations(): SimulationPackage[] {
     try {
-      const customBank = localStorage.getItem(STORAGE_KEYS.SIMULATION_BANK);
-      if (customBank) {
-        const parsed = JSON.parse(customBank);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge custom with default sample bank
-          const customIds = new Set(parsed.map((s: SimulationPackage) => s.id));
-          const missingDefaults = SAMPLE_SIMULATIONS.filter(s => !customIds.has(s.id));
-          return [...parsed, ...missingDefaults];
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const customBank = localStorage.getItem(STORAGE_KEYS.SIMULATION_BANK);
+        if (customBank) {
+          const parsed = JSON.parse(customBank);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Strictly validate that each simulation has complete parts to prevent runtime crashes
+            const validCustom = parsed.filter((s: SimulationPackage) =>
+              s && s.id && s.title &&
+              Array.isArray(s.listeningParts) && s.listeningParts.length > 0 &&
+              Array.isArray(s.readingParts) && s.readingParts.length > 0 &&
+              Array.isArray(s.writingTasks) && s.writingTasks.length > 0 &&
+              Array.isArray(s.speakingTasks) && s.speakingTasks.length > 0
+            );
+            const customIds = new Set(validCustom.map((s: SimulationPackage) => s.id));
+            const missingDefaults = SAMPLE_SIMULATIONS.filter(s => !customIds.has(s.id));
+            return [...validCustom, ...missingDefaults];
+          }
         }
       }
     } catch (e) {
@@ -114,30 +173,44 @@ export const storageService = {
   },
 
   saveCustomSimulation(sim: SimulationPackage): void {
-    const sims = this.getAllSimulations();
-    const existingIdx = sims.findIndex(s => s.id === sim.id);
-    if (existingIdx >= 0) {
-      sims[existingIdx] = sim;
-    } else {
-      sims.unshift(sim);
+    try {
+      const sims = this.getAllSimulations();
+      const existingIdx = sims.findIndex(s => s.id === sim.id);
+      if (existingIdx >= 0) {
+        sims[existingIdx] = sim;
+      } else {
+        sims.unshift(sim);
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEYS.SIMULATION_BANK, JSON.stringify(sims));
+      }
+    } catch (e) {
+      console.warn('Could not save simulation bank:', e);
     }
-    localStorage.setItem(STORAGE_KEYS.SIMULATION_BANK, JSON.stringify(sims));
   },
 
   getNextUnseenSimulation(userDifficulty?: DifficultyLevel): SimulationPackage {
-    const seen = this.getSeenItemHashes();
-    const all = this.getAllSimulations();
-    // Prioritize unseen simulations matching target difficulty or standard
-    const unseen = all.filter(s => !seen.has(s.id));
-    if (unseen.length > 0) {
-      if (userDifficulty) {
-        const matched = unseen.find(s => s.difficultyLevel === userDifficulty);
-        if (matched) return matched;
+    try {
+      const seen = this.getSeenItemHashes();
+      const all = this.getAllSimulations();
+      if (!all || all.length === 0) return SAMPLE_SIMULATIONS[0];
+
+      // Prioritize unseen simulations matching target difficulty or standard
+      const unseen = all.filter(s => s && s.id && !seen.has(s.id));
+      if (unseen.length > 0) {
+        if (userDifficulty) {
+          const matched = unseen.find(s => s.difficultyLevel === userDifficulty);
+          if (matched) return matched;
+        }
+        return unseen[0] || SAMPLE_SIMULATIONS[0];
       }
-      return unseen[0];
+      // If all seen, pick the least recently attempted or random from bank
+      const randomSim = all[Math.floor(Math.random() * all.length)];
+      return randomSim || SAMPLE_SIMULATIONS[0];
+    } catch (err) {
+      console.error('Error getting unseen simulation:', err);
+      return SAMPLE_SIMULATIONS[0];
     }
-    // If all seen, pick the least recently attempted or random from bank
-    return all[Math.floor(Math.random() * all.length)];
   },
 
   // SRS VOCABULARY
